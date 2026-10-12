@@ -5,7 +5,7 @@ This project is a synthetic ID number generator and validator for learning, demo
 - Command-line mode
 - 17-digit checksum calculation
 - Exhaustive 14-digit base-number generation
-- Controlled batch generation (limited or infinite)
+- Controlled batch generation (user-selected count or infinite)
 
 Important notice
 - Intended for study, testing, demonstration, and simulation only

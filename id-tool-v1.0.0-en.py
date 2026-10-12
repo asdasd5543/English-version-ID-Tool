@@ -17,8 +17,6 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple
 
-MAX_SAFE_GENERATION_COUNT = 1000
-
 # Checksum calculation constants
 _WEIGHTS = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2]
 _MAPPING = ['1', '0', 'X', '9', '8', '7', '6', '5', '4', '3', '2']
@@ -131,15 +129,10 @@ def cmd_generate(args: argparse.Namespace) -> int:
     is_infinite = bool(getattr(args, "infinite", False))
     count_value = int(getattr(args, "count", 10))
 
-    if count_value > MAX_SAFE_GENERATION_COUNT and not is_infinite:
-        print(
-            f"Requested record count ({count_value}) exceeds the safety limit of {MAX_SAFE_GENERATION_COUNT}. "
-            "Reduce the value or use --infinite with explicit confirmation."
-        )
-        return 1
-
     if is_infinite or not getattr(args, "confirm", False):
         print("Warning: generating ID numbers may be sensitive and is intended only for academic, testing, or simulation use.")
+        if count_value > 1000:
+            print(f"You requested {count_value} records. Large batches should be used only with explicit intent.")
         if not getattr(args, "confirm", False):
             try:
                 ans = input("Continue? Enter 'y' to confirm: ").strip().lower()
