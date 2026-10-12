@@ -11,20 +11,12 @@ This section lists the versions of this project that currently receive security 
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in this project, please report it through the following email:
+If you discover potential security issues in this project, please submit a public report via GitHub Issues: 
 
-Email:
-asdqaz5543@Outlook.com
+https://github.com/asdasd5543/id-tool/issues
 
-When reporting a vulnerability, please include as much information as possible:
+Please provide a description of the issue, reproduction steps, scope of impact, and related screenshots whenever possible. 
 
-- Detailed description of the vulnerability
-- Steps to reproduce the issue
-- Possible impact
-- Screenshots or logs (if available)
+Please note that Issues are public, and submitted content may be viewed by everyone. Do not publish your real ID number, sensitive personal information, password, or other confidential data in your report. 
 
-We will review received vulnerability reports as soon as possible and take appropriate action after confirmation.
-
-For confirmed security issues, we may release updates or fixes depending on the situation.
-
-Thank you for helping improve the security of this project.
+Thank you for helping to improve this project. Thank you.
