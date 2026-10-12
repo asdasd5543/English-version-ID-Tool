@@ -1,58 +1,58 @@
 # ID Tool
 
-This is an ID number generation/verification tool for learning, demonstration, and testing, including: 
-- Interactive menu
+This project is a synthetic ID number generator and validator for learning, demonstration, and testing. It includes:
+- An interactive menu
 - Command-line mode
-- 17-bit check bit calculation
-- 14-bit basic information exhaustive
-- Controllable batch generation (limited/unlimited)
+- 17-digit checksum calculation
+- Exhaustive 14-digit base-number generation
+- Controlled batch generation (limited or infinite)
 
-Important note
-- For study, testing, demonstration, and simulation purposes only
-- Strictly prohibited from any illegal use, identity fraud, privacy violations, or violations of local laws and regulations
-- Do not submit real personal information, real ID numbers, or real area code data into the warehouse
+Important notice
+- Intended for study, testing, demonstration, and simulation only
+- Strictly prohibited: illegal use, identity fraud, privacy violations, or any violation of local laws and regulations
+- Do not submit real personal information, real ID numbers, or real area-code data to this repository
 
-## How to use
+## Usage
 
-### 1. Interactive operation
+### 1. Interactive mode
 ```bash
-python id_tool.py
+python id-tool-v1.0.0-en.py
 ```
 
-### 2. Generate samples
+### 2. Generate sample IDs
 ```bash
-python id_tool.py generate --count 10 --output results.csv
+python id-tool-v1.0.0-en.py generate --count 10 --output results.csv
 ```
 
-### 3. Unlimited generation (use with caution)
+### 3. Infinite generation (use with caution)
 ```bash
-python id_tool.py generate --infinite --output output/id_stream.csv
+python id-tool-v1.0.0-en.py generate --infinite --output output/id_stream.csv --confirm
 ```
 
-### 4. Calculate the 17-bit check code
+### 4. Calculate the 17-digit checksum
 ```bash
-python id_tool.py calc17 11000020000101123
+python id-tool-v1.0.0-en.py calc17 11000020000101123
 ```
 
-### 5. 14 Exhaustive Listings
+### 5. Exhaustive 14-digit search
 ```bash
-python id_tool.py exhaust14 11000020000101 --filter male
+python id-tool-v1.0.0-en.py exhaust14 11000020000101 --filter male
 ```
 
-## Document Description
-- 'id_tool.py': Main script
-- 'README.md': Project description
-- 'LICENSE': MIT license
-- '.gitignore': Ignores development and output files
+## Project files
+- `id-tool-v1.0.0-en.py`: main script
+- `README.md`: project documentation
+- `LICENSE`: MIT license
+- `.gitignore`: ignores local development and output files
 
-## Safety Recommendations
-- Keep the warehouse private or share it only with trusted users
-- Do not store real ID card data in the warehouse
-- If you need a real area code, please provide it yourself and comply with local laws and regulations
-- Always confirm permissions and compliance before using in any public setting
+## Safety recommendations
+- Keep this repository private or share it only with trusted users
+- Do not store real ID-card data in the repository
+- If you need real area codes, obtain them legally and only in compliance with local laws and regulations
+- Always verify permissions and compliance before using the tool in public or shared environments
 
-## Chinese and English versions of the prompt
+## Chinese and English versions
 
-To use the Chinese version of ID-Tool, please go to https://github.com/asdasd5543/id-tool/releases/tag/v1.0.0
+To use the Chinese version of ID Tool, visit: https://github.com/asdasd5543/id-tool/releases/tag/v1.0.0
 
-To use the English version of the ID-Tool, please visit https://github.com/asdasd5543/English-version-ID-Tool/releases/tag/v1.0.0
+To use the English version of ID Tool, visit: https://github.com/asdasd5543/English-version-ID-Tool/releases/tag/v1.0.0

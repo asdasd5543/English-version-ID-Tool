@@ -13,9 +13,11 @@ import csv
 import random
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple
+
+MAX_SAFE_GENERATION_COUNT = 1000
 
 # Checksum calculation constants
 _WEIGHTS = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2]
@@ -30,14 +32,10 @@ class UserInterruptedToMenu(Exception):
 
 
 def get_system_location_info() -> Tuple[datetime, str, str]:
-    local_now = datetime.now()
-    is_dst = time.localtime().tm_isdst
-    try:
-        tz_name = time.tzname[1] if is_dst else time.tzname[0]
-    except Exception:
-        tz_name = "Local"
-    utc_offset_seconds = (datetime.now() - datetime.utcnow()).total_seconds()
-    utc_offset_hours = utc_offset_seconds / 3600.0
+    local_now = datetime.now().astimezone()
+    tz_name = "Local Time"
+    offset = local_now.utcoffset()
+    utc_offset_hours = (offset.total_seconds() / 3600.0) if offset else 0.0
     offset_str = f"UTC{utc_offset_hours:+.1f}"
     return local_now, tz_name, offset_str
 
@@ -103,7 +101,7 @@ def random_id_sequence(
             random_days = random.randint(0, delta_days - 1)
             target_date = start_date + timedelta(days=random_days)
             birthday_str = target_date.strftime("%Y%m%d")
-            friendly_birthday = target_date.strftime("%Y年%m月%d日")
+            friendly_birthday = target_date.strftime("%Y-%m-%d")
             sequence_num = str(random.randint(0, 999)).zfill(3)
             front_17 = f"{area}{birthday_str}{sequence_num}"
             check_char = calculate_check_digit(front_17)
@@ -115,7 +113,7 @@ def random_id_sequence(
             random_days = random.randint(0, delta_days - 1)
             target_date = start_date + timedelta(days=random_days)
             birthday_str = target_date.strftime("%Y%m%d")
-            friendly_birthday = target_date.strftime("%Y年%m月%d日")
+            friendly_birthday = target_date.strftime("%Y-%m-%d")
             sequence_num = str(random.randint(0, 999)).zfill(3)
             front_17 = f"{area}{birthday_str}{sequence_num}"
             check_char = calculate_check_digit(front_17)
@@ -126,17 +124,25 @@ def random_id_sequence(
 def cmd_generate(args: argparse.Namespace) -> int:
     """
     Generate ID number samples in batches.
-    - 如果 args.infinite 为 True，则无限生成直到 Ctrl+C（必须确认）
-    - 若输出到文件，在Infinite mode下采取流式写入
-    在捕获到 KeyboardInterrupt 时抛出 UserInterruptedToMenu，以便返回交互式菜单而不是Exit程序。
+    - When args.infinite is True, generation continues until Ctrl+C is pressed and requires explicit confirmation.
+    - When output is directed to a file, infinite mode writes incrementally to avoid loading everything in memory.
+    - User interruptions are converted into a return to the interactive menu instead of exiting the program.
     """
     is_infinite = bool(getattr(args, "infinite", False))
-    # 确认保护：Infinite mode必须确认，有限模式若未确认也弹交互确认
+    count_value = int(getattr(args, "count", 10))
+
+    if count_value > MAX_SAFE_GENERATION_COUNT and not is_infinite:
+        print(
+            f"Requested record count ({count_value}) exceeds the safety limit of {MAX_SAFE_GENERATION_COUNT}. "
+            "Reduce the value or use --infinite with explicit confirmation."
+        )
+        return 1
+
     if is_infinite or not getattr(args, "confirm", False):
-        print("警告：Batch generation of ID numbers may be sensitive and is limited to academic/testing/simulation purposes.")
+        print("Warning: generating ID numbers may be sensitive and is intended only for academic, testing, or simulation use.")
         if not getattr(args, "confirm", False):
             try:
-                ans = input("Continue? Enter y to confirm: ").strip().lower()
+                ans = input("Continue? Enter 'y' to confirm: ").strip().lower()
             except (KeyboardInterrupt, EOFError):
                 print("\nCancelled.")
                 return 1
@@ -144,20 +150,21 @@ def cmd_generate(args: argparse.Namespace) -> int:
                 print("Cancelled.")
                 return 1
 
-    # 加载区域码（若提供文件则优先）
     if getattr(args, "area_codes_file", None):
+        if not getattr(args, "allow_custom_area_codes", False):
+            print("Custom area-code files are disabled by default. Re-run with --allow-custom-area-codes only if you explicitly intend to use a custom source.")
+            return 1
         try:
             area_codes = load_area_codes_from_file(Path(args.area_codes_file))
             if not area_codes:
-                print("No area codes loaded from file. Exiting.")
+                print("No area codes were loaded from the supplied file. Exiting.")
                 return 1
         except Exception as e:
-            print(f"Failed to load area code file: {e}")
+            print(f"Failed to load the custom area-code file: {e}")
             return 1
     else:
         area_codes = _DEFAULT_AREA_CODES
 
-    # 解析日期
     try:
         start_date = datetime.strptime(getattr(args, "start", "2000-01-01"), "%Y-%m-%d")
         end_date = datetime.strptime(getattr(args, "end", "2020-01-01"), "%Y-%m-%d")
@@ -165,12 +172,11 @@ def cmd_generate(args: argparse.Namespace) -> int:
         print(f"Invalid date format: {e}")
         return 1
 
-    # Determine count: None means infinite
-    count_param: Optional[int] = None if is_infinite else int(getattr(args, "count", 10))
+    count_param: Optional[int] = None if is_infinite else count_value
 
     generated = 0
 
-    # 如果输出到文件且是Infinite mode，使用流式写入
+    # If output is directed to a file in infinite mode, write incrementally to avoid loading the full stream in memory.
     outfile = None
     if getattr(args, "output", None):
         out_path = Path(args.output)
@@ -191,13 +197,13 @@ def cmd_generate(args: argparse.Namespace) -> int:
                 if is_infinite:
                     outfile.flush()
     except KeyboardInterrupt:
-        # 捕获 Ctrl+C：不要Exit程序，转为返回主菜单
+        # Catch Ctrl+C and return to the main menu without exiting the program.
         if outfile:
             try:
                 outfile.flush()
             except Exception:
                 pass
-        print(f"\n[⚠️] Interrupted by user. Generated {generated} records. Returning to main menu...")
+        print(f"\n[!] Interrupted by user. Generated {generated} records. Returning to the main menu...")
         raise UserInterruptedToMenu(generated)
     except Exception as e:
         print(f"\nError during generation: {e}")
@@ -209,9 +215,9 @@ def cmd_generate(args: argparse.Namespace) -> int:
             outfile.close()
 
     if not is_infinite:
-        print(f"Completed: generated {generated} records (range: {getattr(args, 'start', '2000-01-01')} 至 {getattr(args, 'end', '2020-01-01')}）。")
+        print(f"Completed: generated {generated} records (range: {getattr(args, 'start', '2000-01-01')} to {getattr(args, 'end', '2020-01-01')}).")
     else:
-        print(f"Infinite mode结束：本次共生成 {generated} 条记录（正常结束）")
+        print(f"Infinite mode stopped normally: generated {generated} records in total.")
     return 0
 
 
@@ -230,13 +236,13 @@ def cmd_calc17(args: argparse.Namespace) -> int:
     month = s[10:12]
     day = s[12:14]
     gender_digit = int(s[-1])
-    gender_symbol = "🚹 Male" if gender_digit % 2 != 0 else "🚺 Female"
+    gender_symbol = "Male" if gender_digit % 2 != 0 else "Female"
 
     print("-" * 50)
-    print(f"📅 Birthday : {year}年 {month}月 {day}日")
-    print(f"🧬 Gender : {gender_symbol}")
-    print(f"🧠 18th digit checksum : {check_char}")
-    print(f"🆔 Full sequence : {s}{check_char}")
+    print(f"Birthday: {year}-{month}-{day}")
+    print(f"Gender: {gender_symbol}")
+    print(f"18th digit checksum: {check_char}")
+    print(f"Full sequence: {s}{check_char}")
     print("-" * 50)
     return 0
 
@@ -244,7 +250,7 @@ def cmd_calc17(args: argparse.Namespace) -> int:
 def cmd_exhaust14(args: argparse.Namespace) -> int:
     base = args.value.strip()
     if len(base) != 14 or not base.isdigit():
-        print("错误：Please enter exactly 14 digits.")
+        print("Error: Please enter exactly 14 digits.")
         return 1
 
     filter_choice = args.filter.lower()
@@ -278,7 +284,7 @@ def cmd_exhaust14(args: argparse.Namespace) -> int:
 
             front_17 = base + seq_str
             check_character = calculate_check_digit(front_17)
-            gender_symbol = "🚹 Male" if is_male else "🚺 Female"
+            gender_symbol = "Male" if is_male else "Female"
             count += 1
             line = f"[{count}][{seq_str}] {front_17}{check_character} | {gender_symbol}"
             print(line)
@@ -303,30 +309,31 @@ def cmd_exhaust14(args: argparse.Namespace) -> int:
 
 def build_arg_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="ID number sequence tool (restricted, safe defaults)",
-        epilog="Disclaimer: For educational/testing/simulation purposes only. Illegal use is strictly prohibited.",
+        description="Synthetic ID number generator and validator (restricted, safe defaults)",
+        epilog="Disclaimer: For educational, testing, and simulation use only. Illegal use is strictly prohibited.",
     )
     p.add_argument("--version", action="version", version="id-tool 1.3")
     sub = p.add_subparsers(dest="cmd")
 
-    gen = sub.add_parser("generate", help="Generate ID samples (controlled)")
-    gen.add_argument("--count", type=int, default=10, help="Number of records (default 10, --infinite takes priority)")
-    gen.add_argument("--infinite", action="store_true", help="Enable infinite generation until interrupted (confirmation required)")
-    gen.add_argument("--start", default="2000-01-01", help="Start date (YYYY-MM-DD)，默认 2000-01-01")
-    gen.add_argument("--end", default="2020-01-01", help="End date (YYYY-MM-DD)，默认 2020-01-01 (不含)")
-    gen.add_argument("--area-codes-file", default=None, help="Area code file path (CSV or one code per line)")
-    gen.add_argument("--output", default=None, help="Optional: output to file (CSV format)")
+    gen = sub.add_parser("generate", help="Generate synthetic ID samples under safe defaults")
+    gen.add_argument("--count", type=int, default=10, help="Number of records to generate (default 10; --infinite takes priority)")
+    gen.add_argument("--infinite", action="store_true", help="Generate indefinitely until interrupted (requires explicit confirmation)")
+    gen.add_argument("--start", default="2000-01-01", help="Start date (YYYY-MM-DD), default 2000-01-01")
+    gen.add_argument("--end", default="2020-01-01", help="End date (YYYY-MM-DD), default 2020-01-01 (exclusive)")
+    gen.add_argument("--area-codes-file", default=None, help="Custom area-code file path (CSV or one code per line)")
+    gen.add_argument("--allow-custom-area-codes", action="store_true", help="Explicitly allow loading a custom area-code file")
+    gen.add_argument("--output", default=None, help="Optional output file path (CSV format)")
     gen.add_argument("--confirm", action="store_true", help="Skip interactive confirmation")
     gen.set_defaults(func=cmd_generate)
 
-    c17 = sub.add_parser("calc17", help="Calculate 18th checksum digit and parse birthday/gender (17 digits input)")
+    c17 = sub.add_parser("calc17", help="Calculate the 18th checksum digit and parse the birthday and gender")
     c17.add_argument("value", help="17-digit number")
     c17.set_defaults(func=cmd_calc17)
 
-    ex = sub.add_parser("exhaust14", help="Exhaust 000-999 sequences from 14-digit base (gender filtering available)")
+    ex = sub.add_parser("exhaust14", help="Exhaust 000-999 sequence variants for a 14-digit base (optional gender filtering)")
     ex.add_argument("value", help="14-digit base number")
     ex.add_argument("--filter", default="all", help="Filter: male / female / all (default all)")
-    ex.add_argument("--output", default=None, help="可选：输出到文件 (CSV)")
+    ex.add_argument("--output", default=None, help="Optional output file path (CSV)")
     ex.add_argument("--confirm", action="store_true", help="Skip interactive confirmation")
     ex.set_defaults(func=cmd_exhaust14)
 
@@ -335,14 +342,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 def interactive_mode() -> int:
     """
-    交互式菜单（当用户双击或未提供 CLI 参数时使用）
-    捕获并处理 UserInterruptedToMenu，以确保 Ctrl+C 不会Exit程序。
+    Interactive menu used when the user launches the script without CLI arguments.
+    Handles UserInterruptedToMenu so Ctrl+C returns to the menu instead of exiting the program.
     """
     while True:
         local_now, tz_name, offset_str = get_system_location_info()
         print("\n" + "=" * 50)
-        print("🎛️  Automated Data Control Center (Interactive)")
-        print(f"🌐 Node location: {tz_name} ({offset_str}) | {local_now.strftime('%Y-%m-%d %H:%M:%S')}")
+        print("Synthetic ID Tool (Interactive Menu)")
+        print(f"System location: {tz_name} ({offset_str}) | {local_now.strftime('%Y-%m-%d %H:%M:%S')}")
         print("=" * 50)
         print("1. Batch generation (generate)")
         print("2. 17-digit checksum calculation (calc17)")
@@ -352,76 +359,77 @@ def interactive_mode() -> int:
         try:
             choice = input("Select function (1-4): ").strip()
         except (KeyboardInterrupt, EOFError):
-            print("\n已取消，Exit。")
+            print("\nCancelled. Exiting.")
             return 0
 
         if choice == '1':
-            # 支持输入 inf/infinite 表示无限生成
-            cnt_raw = input("Number of records (enter inf for infinite, default 10):: ").strip() or "10"
+            cnt_raw = input("Number of records (enter 'inf' for infinite mode, default 10): ").strip() or "10"
             if cnt_raw.lower() in ("inf", "infinite"):
-                count = 0  # placeholder
+                count = 0
                 infinite = True
             else:
                 infinite = False
                 try:
                     count = int(cnt_raw)
                     if count < 0:
-                        print("无效数字，使用默认 10。")
+                        print("Invalid value. Using default 10.")
                         count = 10
                 except ValueError:
-                    print("无效输入，使用默认 10。")
+                    print("Invalid input. Using default 10.")
                     count = 10
-            start = input("Start date (YYYY-MM-DD) [默认 2000-01-01]: ").strip() or "2000-01-01"
-            end = input("End date (YYYY-MM-DD) [默认 2020-01-01]: ").strip() or "2020-01-01"
-            acf = input("Area code file path (leave empty for example codes): ").strip() or None
-            out = input("Output file (leave empty for no file): ").strip() or None
-            # 构造 Namespace 与调用
+            start = input("Start date (YYYY-MM-DD) [default 2000-01-01]: ").strip() or "2000-01-01"
+            end = input("End date (YYYY-MM-DD) [default 2020-01-01]: ").strip() or "2020-01-01"
+            acf = input("Area-code file path (leave blank for sample codes): ").strip() or None
+            allow_custom = False
+            if acf:
+                allow_custom = input("Allow custom area codes? Enter 'y' to confirm: ").strip().lower() == 'y'
+            out = input("Output file (leave blank for no file): ").strip() or None
             ns = argparse.Namespace(
                 count=count,
                 infinite=infinite,
                 start=start,
                 end=end,
                 area_codes_file=acf,
+                allow_custom_area_codes=allow_custom,
                 output=out,
-                confirm=True,  # 交互模式默认跳过二次确认以便顺畅体验
+                confirm=True,
             )
             try:
                 cmd_generate(ns)
             except UserInterruptedToMenu as e:
-                # 已在 cmd_generate 中打印提示，这里仅让交互继续
+                # The generation function already printed a message; just continue showing the menu.
                 pass
-            # 等待用户回到菜单：即便用户在生成时按过 Ctrl+C，也不要因为上次 Ctrl+C 而跳过这个等待
             try:
-                input("\nPress Enter to return to main menu...")
+                input("\nPress Enter to return to the main menu...")
             except (KeyboardInterrupt, EOFError):
-                # 忽略，直接回到菜单
+                # Ignore and return to the menu immediately.
                 pass
         elif choice == '2':
-            val = input("请输入 17-digit number: ").strip()
+            val = input("Enter a 17-digit number: ").strip()
             ns = argparse.Namespace(value=val)
             try:
                 cmd_calc17(ns)
             except UserInterruptedToMenu:
                 pass
             try:
-                input("\nPress Enter to return to main menu...")
+                input("\nPress Enter to return to the main menu...")
             except (KeyboardInterrupt, EOFError):
                 pass
         elif choice == '3':
-            val = input("请输入 14-digit base number: ").strip()
+            val = input("Enter a 14-digit base number: ").strip()
             filt = input("Filter (male/female/all) [default all]: ").strip() or "all"
-            out = input("Output file (leave empty for no file): ").strip() or None
+            out = input("Output file (leave blank for no file): ").strip() or None
             ns = argparse.Namespace(value=val, filter=filt, output=out, confirm=True)
             try:
                 cmd_exhaust14(ns)
             except UserInterruptedToMenu:
                 pass
             try:
-                input("\nPress Enter to return to main menu...")
+                input("\nPress Enter to return to the main menu...")
             except (KeyboardInterrupt, EOFError):
                 pass
         elif choice == '4':
-            print("Exit。")
+            print("Exiting.")
             return 0
         else:
             print("Invalid option. Please enter 1-4.")
@@ -430,26 +438,26 @@ def interactive_mode() -> int:
 def main(argv: Optional[List[str]] = None) -> int:
     parser = build_arg_parser()
 
-    # 如果没有提供命令行参数（例如双击运行或直接 python script.py），进入交互式菜单
+    # If no CLI arguments are supplied (for example, when double-clicking the script), show the interactive menu.
     if argv is None and len(sys.argv) == 1:
         return interactive_mode()
 
-    # 常规 CLI 路径：解析并执行子命令
+    # Standard CLI path: parse arguments and execute the selected subcommand.
     args = parser.parse_args(argv)
     local_now, tz_name, offset_str = get_system_location_info()
-    print(f"节点: {tz_name} ({offset_str}) | Current time: {local_now.strftime('%Y-%m-%d %H:%M:%S')}")
-    print("注意：本工具默认使用较保守的示例区域码，如需真实区域码，请提供 --area-codes-file。")
+    print(f"System location: {tz_name} ({offset_str}) | Current time: {local_now.strftime('%Y-%m-%d %H:%M:%S')}")
+    print("Notice: This tool defaults to a conservative set of sample area codes. To use a custom source, use --area-codes-file together with --allow-custom-area-codes.")
     print("---------")
     try:
         if hasattr(args, "func"):
             try:
                 return args.func(args)
             except UserInterruptedToMenu:
-                # 在 CLI 模式下按 Ctrl+C 也不要直接Exit程序，转而进入交互式菜单
-                print("已中止当前命令，进入交互式菜单。")
+                # In CLI mode, Ctrl+C should return to the interactive menu instead of terminating the program.
+                print("The current command was interrupted. Returning to the interactive menu.")
                 return interactive_mode()
         else:
-            # 如果没有 func（例如没有子命令），进入交互式模式
+            # If no function is bound (for example, when no subcommand was supplied), show the interactive menu.
             return interactive_mode()
     except Exception as e:
         print(f"Unhandled exception: {e}")
