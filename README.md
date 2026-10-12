@@ -1,58 +1,79 @@
 # ID Tool
 
-This is an ID number generation/verification tool for learning, demonstration, and testing, including: 
-- Interactive menu
-- Command-line mode
-- 17-bit check bit calculation
-- 14-bit basic information exhaustive
-- Controllable batch generation (limited/unlimited)
+ID Tool is a Python command-line and interactive utility for generating synthetic ID-number samples and demonstrating checksum calculations. Use it only for educational, testing, and simulation purposes.
 
-Important note
-- For study, testing, demonstration, and simulation purposes only
-- Strictly prohibited from any illegal use, identity fraud, privacy violations, or violations of local laws and regulations
-- Do not submit real personal information, real ID numbers, or real area code data into the warehouse
+## Features
 
-## How to use
+- Interactive menu and command-line interface
+- User-selected batch size, with no hard generation limit
+- Optional continuous generation, stopped with `Ctrl+C`
+- 18-digit checksum calculation from a 17-digit input
+- Exhaustive generation of sequence variants for a 14-digit base
+- Sample area codes included by default; custom area-code files require explicit opt-in
 
-### 1. Interactive operation
+## Requirements
+
+- Python 3.8 or later
+- No third-party packages are required
+
+## Usage
+
+Run the interactive menu:
+
 ```bash
-python id_tool.py
+python id-tool-v1.0.1-en.py
 ```
 
-### 2. Generate samples
+In the menu, choose batch generation and enter the number of records you want. There is no fixed maximum. Large batches may take longer to generate and use more disk space; the program displays a warning and asks for confirmation.
+
+To generate a specific number of records from the command line:
+
 ```bash
-python id_tool.py generate --count 10 --output results.csv
+python id-tool-v1.0.1-en.py generate --count 10 --output results.csv
 ```
 
-### 3. Unlimited generation (use with caution)
+To generate continuously until interrupted:
+
 ```bash
-python id_tool.py generate --infinite --output output/id_stream.csv
+python id-tool-v1.0.1-en.py generate --infinite --output output/id_stream.csv
 ```
 
-### 4. Calculate the 17-bit check code
+`--confirm` skips the interactive confirmation prompt. Use it only when running the command non-interactively and you have checked the requested operation.
+
+Calculate the checksum digit for a 17-digit value:
+
 ```bash
-python id_tool.py calc17 11000020000101123
+python id-tool-v1.0.1-en.py calc17 11000020000101123
 ```
 
-### 5. 14 Exhaustive Listings
+Generate sequence variants for a 14-digit base, optionally filtering by gender:
+
 ```bash
-python id_tool.py exhaust14 11000020000101 --filter male
+python id-tool-v1.0.1-en.py exhaust14 11000020000101 --filter male
 ```
 
-## Document Description
-- 'id_tool.py': Main script
-- 'README.md': Project description
-- 'LICENSE': MIT license
-- '.gitignore': Ignores development and output files
+To use your own area-code file, explicitly enable it:
 
-## Safety Recommendations
-- Keep the warehouse private or share it only with trusted users
-- Do not store real ID card data in the warehouse
-- If you need a real area code, please provide it yourself and comply with local laws and regulations
-- Always confirm permissions and compliance before using in any public setting
+```bash
+python id-tool-v1.0.1-en.py generate --count 10 --area-codes-file area_codes.csv --allow-custom-area-codes
+```
 
-## Chinese and English versions of the prompt
+The custom file can be a CSV file with area codes in its first column or a plain-text file with one code per line.
 
-To use the Chinese version of ID-Tool, please go to https://github.com/asdasd5543/id-tool/releases/tag/v1.0.0
+## Safety and privacy
 
-To use the English version of the ID-Tool, please visit https://github.com/asdasd5543/English-version-ID-Tool/releases/tag/v1.0.0
+- Use generated values only as synthetic test data. Do not use them to impersonate real people, bypass identity checks, or create fraudulent documents.
+- Do not enter or store real personal information, ID numbers, or sensitive area-code datasets in this repository.
+- Obtain any custom data lawfully and follow applicable privacy requirements and local laws.
+- Be aware that large or continuous runs can consume significant time and storage.
+
+## Project files
+
+- `id-tool-v1.0.1-en.py`: main script
+- `README.md`: project documentation
+- `LICENSE`: MIT license
+
+## Chinese and English versions
+
+- Chinese version: https://github.com/asdasd5543/id-tool/releases/tag/v1.0.0
+- English version: https://github.com/asdasd5543/English-version-ID-Tool/releases/tag/v1.0.1
