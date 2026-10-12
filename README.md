@@ -50,3 +50,9 @@ python id_tool.py exhaust14 11000020000101 --filter male
 - Do not store real ID card data in the warehouse
 - If you need a real area code, please provide it yourself and comply with local laws and regulations
 - Always confirm permissions and compliance before using in any public setting
+
+## Chinese and English versions of the prompt
+
+To use the Chinese version of ID-Tool, please go to https://github.com/asdasd5543/id-tool/releases/tag/v1.0.0
+
+To use the English version of the ID-Tool, please visit https://github.com/asdasd5543/English-version-ID-Tool/releases/tag/v1.0.0
